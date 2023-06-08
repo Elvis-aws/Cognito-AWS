@@ -1,0 +1,125 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Amazon Cognito provides authentication, authorization, and user management
+  for your web and mobile apps. Your users can sign in directly with a user name and
+  password, or through a third party such as Facebook, Amazon, Google or Apple.
+Parameters:
+  BucketWesSiteEndpointUrl:
+    Type: String
+    Default: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket
+  SigninHtml1:
+    Type: String
+    Default: https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=26sgbjgalgk94t1kbvc266p3rj&redirect_uri=https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/signin.html
+  SignoutHtml1:
+    Type: String
+    Default: https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/logout?response_type=code&client_id=26sgbjgalgk94t1kbvc266p3rj&logout_uri=https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/signout.html
+Resources:
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AutoVerifiedAttributes:
+      - email
+      UsernameAttributes:
+      - email
+      UserPoolName:
+        Fn::Sub: ${AWS::StackName}-UserPool
+      Schema:
+      - AttributeDataType: String
+        Mutable: true
+        Name: name
+        Required: true
+  UserPoolAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AccessTokenValidity: 60
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+      - code
+      - implicit
+      AllowedOAuthScopes:
+      - aws.cognito.signin.user.admin
+      - email
+      - openid
+      - phone
+      - profile
+      CallbackURLs:
+      - http://localhost:9000
+      ClientName:
+        Fn::Sub: ${AWS::StackName}-UserPoolClient
+      EnableTokenRevocation: true
+      ExplicitAuthFlows:
+      - ALLOW_CUSTOM_AUTH
+      - ALLOW_REFRESH_TOKEN_AUTH
+      - ALLOW_USER_SRP_AUTH
+      IdTokenValidity: 60
+      LogoutURLs:
+      - http://localhost:3000
+      PreventUserExistenceErrors: ENABLED
+      RefreshTokenValidity: 30
+      SupportedIdentityProviders:
+      - COGNITO
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      UserPoolId:
+        Ref: UserPool
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: s3-bucket-cognt
+      UserPoolId:
+        Ref: UserPool
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName:
+        Fn::Sub: ${AWS::StackName}-s3-bucket
+      MetricsConfigurations:
+      - Id: EntireBucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: 404.html
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket:
+        Ref: S3Bucket
+      PolicyDocument:
+        Statement:
+          Action:
+          - s3:GetObject
+          Effect: Allow
+          Resource:
+            Fn::Sub: arn:aws:s3:::${S3Bucket}/*
+          Principal: '*'
+Outputs:
+  BucketWesSiteEndpointUrl1:
+    Description: Url for s3 bucket
+    Value:
+      Fn::Sub: https://s3-${AWS::Region}.amazonaws.com/${S3Bucket}
+  BucketWesSiteEndpointUrl2:
+    Description: Url for s3 bucket
+    Value:
+      Fn::GetAtt:
+      - S3Bucket
+      - WebsiteURL
+  UserPoolId:
+    Value:
+      Ref: UserPool
+  UserPoolAppClientId:
+    Value:
+      Ref: UserPoolAppClient
+  CognitoLoginURL:
+    Description: Cognito User Pool Application Client Hosted Login UI URL
+    Value:
+      Fn::Sub:
+      - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appclient}&redirect_uri=http://localhost:9000
+      - appclient:
+          Ref: UserPoolAppClient

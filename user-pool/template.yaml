@@ -1,0 +1,123 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Amazon Cognito provides authentication, authorization, and user management for your web and mobile apps. 
+            Your users can sign in directly with a user name and password, or through a third party such as Facebook, 
+            Amazon, Google or Apple.
+
+
+Resources:
+
+##############################################
+############## Cognito User Pool #############
+##############################################
+# You can specify “email” or “phone_number” for this property. In this case, we will specify the former so that a
+# verification code will be automatically sent to the registered email address upon signup.
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      UserPoolName: !Sub ${AWS::StackName}-UserPool
+      Schema:
+        - AttributeDataType: String
+          Mutable: true
+          Name: name
+          Required: true
+##############################################
+############## User Pool Client ##############
+##############################################
+# An app is an entity within a user pool that has permission to call unauthenticated API operations.
+  UserPoolAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AccessTokenValidity: 60 # (minutes) default value.
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - aws.cognito.signin.user.admin
+        - email
+        - openid
+        - phone
+        - profile
+      CallbackURLs:
+        - http://localhost:9000
+      ClientName: !Sub ${AWS::StackName}-UserPoolClient
+      EnableTokenRevocation: true # default value.
+      ExplicitAuthFlows:
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      IdTokenValidity: 60 # (minutes) default value.
+      LogoutURLs:
+        - http://localhost:3000
+      PreventUserExistenceErrors: ENABLED # default value.
+      RefreshTokenValidity: 30 # (days) default value.
+      SupportedIdentityProviders:
+        - COGNITO
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      UserPoolId: !Ref UserPool
+##############################################
+############## User Pool Domain ##############
+##############################################
+# You need to create a domain for the sign-in/sign-up page with hosted UI.
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: s3-bucket-cognt
+      UserPoolId: !Ref UserPool
+##############################################
+################# S3 Bucket #################
+##############################################
+# Create an S3 bucket, enable the static website hosting feature, and install the following three HTML files.
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-s3-bucket
+      MetricsConfigurations:
+        - Id: EntireBucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: 404.html
+##############################################
+############## S3 Bucket Policy ##############
+##############################################
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          Action:
+            - s3:GetObject
+          Effect: Allow
+          Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+          Principal: "*"
+
+Outputs:
+  BucketWesSiteEndpointUrl1:
+    Description: Url for s3 bucket
+    Value: !Sub "https://s3-${AWS::Region}.amazonaws.com/${S3Bucket}"
+  BucketWesSiteEndpointUrl2:
+    Description: Url for s3 bucket
+    Value: !GetAtt S3Bucket.WebsiteURL
+  Signinurl:
+    Description: Url
+    Value: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+  UserPoolAppClientId:
+    Value: !Ref UserPoolAppClient
+
+# https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=57v01vtgghblf3v25tktgq5o9d&redirect_uri=http://localhost:9000
+# cydKi3-catroj-vujnif
