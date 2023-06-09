@@ -44,7 +44,7 @@ Resources:
         - phone
         - profile
       CallbackURLs:
-        - http://localhost:9000
+        - https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
       ClientName: !Sub ${AWS::StackName}-UserPoolClient
       EnableTokenRevocation: true # default value.
       ExplicitAuthFlows:
@@ -52,8 +52,8 @@ Resources:
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_SRP_AUTH
       IdTokenValidity: 60 # (minutes) default value.
-      LogoutURLs:
-        - http://localhost:3000
+#      LogoutURLs:
+#        - http://localhost:3000
       PreventUserExistenceErrors: ENABLED # default value.
       RefreshTokenValidity: 30 # (days) default value.
       SupportedIdentityProviders:
@@ -107,17 +107,21 @@ Resources:
           Principal: "*"
 
 Outputs:
-  BucketWesSiteEndpointUrl1:
-    Description: Url for s3 bucket
-    Value: !Sub "https://s3-${AWS::Region}.amazonaws.com/${S3Bucket}"
-  BucketWesSiteEndpointUrl2:
+  BucketWesSiteEndpointUrl:
     Description: Url for s3 bucket
     Value: !GetAtt S3Bucket.WebsiteURL
+  UserPoolId:
+    Description: User Pool Id
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Client App Id
+    Value: !Ref UserPoolAppClient
   Signinurl:
     Description: Url
-    Value: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
-  UserPoolAppClientId:
-    Value: !Ref UserPoolAppClient
+    Value: !Sub
+      - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appClientId}&redirect_uri=${url}
+      - appClientId: !Ref UserPoolAppClient
+        url: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
 
-# https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=57v01vtgghblf3v25tktgq5o9d&redirect_uri=http://localhost:9000
+# ngwesseaws@gmail.com
 # cydKi3-catroj-vujnif

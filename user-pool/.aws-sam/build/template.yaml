@@ -3,16 +3,6 @@ Transform: AWS::Serverless-2016-10-31
 Description: Amazon Cognito provides authentication, authorization, and user management
   for your web and mobile apps. Your users can sign in directly with a user name and
   password, or through a third party such as Facebook, Amazon, Google or Apple.
-Parameters:
-  BucketWesSiteEndpointUrl:
-    Type: String
-    Default: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket
-  SigninHtml1:
-    Type: String
-    Default: https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=26sgbjgalgk94t1kbvc266p3rj&redirect_uri=https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/signin.html
-  SignoutHtml1:
-    Type: String
-    Default: https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/logout?response_type=code&client_id=26sgbjgalgk94t1kbvc266p3rj&logout_uri=https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/signout.html
 Resources:
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -43,7 +33,7 @@ Resources:
       - phone
       - profile
       CallbackURLs:
-      - http://localhost:9000
+      - https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
       ClientName:
         Fn::Sub: ${AWS::StackName}-UserPoolClient
       EnableTokenRevocation: true
@@ -52,8 +42,6 @@ Resources:
       - ALLOW_REFRESH_TOKEN_AUTH
       - ALLOW_USER_SRP_AUTH
       IdTokenValidity: 60
-      LogoutURLs:
-      - http://localhost:3000
       PreventUserExistenceErrors: ENABLED
       RefreshTokenValidity: 30
       SupportedIdentityProviders:
@@ -100,26 +88,16 @@ Resources:
             Fn::Sub: arn:aws:s3:::${S3Bucket}/*
           Principal: '*'
 Outputs:
-  BucketWesSiteEndpointUrl1:
-    Description: Url for s3 bucket
-    Value:
-      Fn::Sub: https://s3-${AWS::Region}.amazonaws.com/${S3Bucket}
-  BucketWesSiteEndpointUrl2:
+  BucketWesSiteEndpointUrl:
     Description: Url for s3 bucket
     Value:
       Fn::GetAtt:
       - S3Bucket
       - WebsiteURL
-  UserPoolId:
-    Value:
-      Ref: UserPool
-  UserPoolAppClientId:
-    Value:
-      Ref: UserPoolAppClient
-  CognitoLoginURL:
-    Description: Cognito User Pool Application Client Hosted Login UI URL
+  Signinurl:
+    Description: Url
     Value:
       Fn::Sub:
-      - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appclient}&redirect_uri=http://localhost:9000
-      - appclient:
+      - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appClientId}&redirect_uri=http://localhost:9000
+      - appClientId:
           Ref: UserPoolAppClient
