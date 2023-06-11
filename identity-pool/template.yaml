@@ -1,0 +1,210 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Amazon Cognito provides authentication, authorization, and user management for your web and mobile apps. 
+            Your users can sign in directly with a user name and password, or through a third party such as Facebook, 
+            Amazon, Google or Apple.
+
+
+Resources:
+
+##############################################
+############## Cognito User Pool #############
+##############################################
+# You can specify “email” or “phone_number” for this property. In this case, we will specify the former so that a
+# verification code will be automatically sent to the registered email address upon signup.
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      UserPoolName: !Sub ${AWS::StackName}-UserPool
+      Schema:
+        - AttributeDataType: String
+          Mutable: true
+          Name: name
+          Required: true
+##############################################
+############## User Pool Client ##############
+##############################################
+# An app is an entity within a user pool that has permission to call unauthenticated API operations.
+  UserPoolAppClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      AccessTokenValidity: 60 # (minutes) default value.
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - code
+        - implicit
+      AllowedOAuthScopes:
+        - aws.cognito.signin.user.admin
+        - email
+        - openid
+        - phone
+        - profile
+      CallbackURLs:
+        - https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+      ClientName: !Sub ${AWS::StackName}-UserPoolClient
+      EnableTokenRevocation: true # default value.
+      ExplicitAuthFlows:
+        - ALLOW_CUSTOM_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+        - ALLOW_USER_SRP_AUTH
+      IdTokenValidity: 60 # (minutes) default value.
+#      LogoutURLs:
+#        - http://localhost:3000
+      PreventUserExistenceErrors: ENABLED # default value.
+      RefreshTokenValidity: 30 # (days) default value.
+      SupportedIdentityProviders:
+        - COGNITO
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      UserPoolId: !Ref CognitoUserPool
+##############################################
+############## User Pool Domain ##############
+##############################################
+# You need to create a domain for the sign-in/sign-up page with hosted UI.
+  UserPoolDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: s3-bucket-cognt
+      UserPoolId: !Ref CognitoUserPool
+##############################################
+################ Identity Pool ###############
+##############################################
+ # Creates a federeated Identity pool
+  IdentityPool:
+    Type: "AWS::Cognito::IdentityPool"
+    Properties:
+      IdentityPoolName: !Sub ${AWS::StackName}-identity
+      AllowUnauthenticatedIdentities: true
+      CognitoIdentityProviders:
+        - ClientId: !Ref UserPoolAppClient
+          ProviderName: !GetAtt CognitoUserPool.ProviderName
+##############################################
+########### Identity Pool Auth Role ##########
+##############################################
+  CognitoUnAuthorizedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action:
+              - sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+              "ForAnyValue:StringLike":
+                "cognito-identity.amazonaws.com:amr": unauthenticated
+      Policies:
+        - PolicyName: CognitoUnauthorizedPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:GetObject*
+                Resource: "*"
+##############################################
+########## Identity Pool UnAuth Role #########
+##############################################
+  CognitoAuthorizedRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: cognito-identity.amazonaws.com
+            Action:
+              - sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "cognito-identity.amazonaws.com:aud": !Ref IdentityPool
+              "ForAnyValue:StringLike":
+                "cognito-identity.amazonaws.com:amr": authenticated
+      Policies:
+        - PolicyName: CognitoAuthorizedPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action: "*"
+                Resource: "*"
+##############################################
+########### Identity Pool Add Roles ##########
+##############################################
+  # Assigns the roles to the Identity Pool
+  IdentityPoolRoleMapping:
+    Type: AWS::Cognito::IdentityPoolRoleAttachment
+    Properties:
+      IdentityPoolId: !Ref IdentityPool
+      Roles:
+        authenticated: !GetAtt CognitoAuthorizedRole.Arn
+        unauthenticated: !GetAtt CognitoUnAuthorizedRole.Arn
+##############################################
+################# S3 Bucket #################
+##############################################
+# Create an S3 bucket, enable the static website hosting feature, and install the following three HTML files.
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Delete
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-s3-bucket
+      MetricsConfigurations:
+        - Id: EntireBucket
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: false
+        BlockPublicPolicy: false
+        IgnorePublicAcls: false
+        RestrictPublicBuckets: false
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: 404.html
+##############################################
+############## S3 Bucket Policy ##############
+##############################################
+  BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref S3Bucket
+      PolicyDocument:
+        Statement:
+          Action:
+            - s3:GetObject
+            - s3:DeleteObject
+            - s3:PutObject
+          Effect: Allow
+          Resource: !Sub "arn:aws:s3:::${S3Bucket}/*"
+          Principal: "*"
+
+Outputs:
+  IdentityPoolId:
+    Description: Identity pool id
+    Value: !Ref IdentityPool
+  BucketWesSiteEndpointUrl:
+    Description: Url for s3 bucket
+    Value: !GetAtt S3Bucket.WebsiteURL
+  UserPoolId:
+    Description: User Pool Id
+    Value: !Ref CognitoUserPool
+  UserPoolClientId:
+    Description: Client App Id
+    Value: !Ref UserPoolAppClient
+  Signinurl:
+    Description: Url
+    Value: !Sub
+      - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appClientId}&redirect_uri=${url}
+      - appClientId: !Ref UserPoolAppClient
+        url: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+
+# ngwesseaws@gmail.com
+# cydKi3-catroj-vujnif

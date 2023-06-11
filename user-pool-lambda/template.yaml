@@ -200,6 +200,7 @@ Resources:
   AccessLogs:
     Type: AWS::Logs::LogGroup
     DependsOn: ApiLoggingRole
+    DeletionPolicy: Delete
     Properties:
       RetentionInDays: 30
       LogGroupName: !Sub "/${AWS::StackName}/APIAccessLogs"
