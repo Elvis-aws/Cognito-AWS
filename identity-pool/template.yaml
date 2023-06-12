@@ -44,13 +44,14 @@ Resources:
         - phone
         - profile
       CallbackURLs:
-        - https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+        - https://s3-eu-west-2.amazonaws.com/identity-pool-s3-bucket/index.html
       ClientName: !Sub ${AWS::StackName}-UserPoolClient
       EnableTokenRevocation: true # default value.
       ExplicitAuthFlows:
         - ALLOW_CUSTOM_AUTH
         - ALLOW_REFRESH_TOKEN_AUTH
         - ALLOW_USER_SRP_AUTH
+        - ALLOW_USER_PASSWORD_AUTH
       IdTokenValidity: 60 # (minutes) default value.
 #      LogoutURLs:
 #        - http://localhost:3000
@@ -111,7 +112,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - s3:GetObject*
-                Resource: "*"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
 ##############################################
 ########## Identity Pool UnAuth Role #########
 ##############################################
@@ -138,7 +140,8 @@ Resources:
             Statement:
               - Effect: Allow
                 Action: "*"
-                Resource: "*"
+                Resource:
+                  - !Sub arn:aws:s3:::${S3Bucket}/*
 ##############################################
 ########### Identity Pool Add Roles ##########
 ##############################################
@@ -204,7 +207,10 @@ Outputs:
     Value: !Sub
       - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appClientId}&redirect_uri=${url}
       - appClientId: !Ref UserPoolAppClient
-        url: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+        url: https://s3-eu-west-2.amazonaws.com/identity-pool-s3-bucket/index.html
+  CognitoAuthCommand:
+    Description: AWS CLI command for Amazon Cognito User Pool authentication
+    Value: !Sub aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id ${UserPoolAppClient} --auth-parameters USERNAME=<username>,PASSWORD=<password>
 
 # ngwesseaws@gmail.com
 # cydKi3-catroj-vujnif

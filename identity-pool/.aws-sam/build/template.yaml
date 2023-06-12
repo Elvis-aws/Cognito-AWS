@@ -33,7 +33,7 @@ Resources:
       - phone
       - profile
       CallbackURLs:
-      - https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+      - https://s3-eu-west-2.amazonaws.com/identity-pool-s3-bucket/index.html
       ClientName:
         Fn::Sub: ${AWS::StackName}-UserPoolClient
       EnableTokenRevocation: true
@@ -41,6 +41,7 @@ Resources:
       - ALLOW_CUSTOM_AUTH
       - ALLOW_REFRESH_TOKEN_AUTH
       - ALLOW_USER_SRP_AUTH
+      - ALLOW_USER_PASSWORD_AUTH
       IdTokenValidity: 60
       PreventUserExistenceErrors: ENABLED
       RefreshTokenValidity: 30
@@ -96,7 +97,8 @@ Resources:
           - Effect: Allow
             Action:
             - s3:GetObject*
-            Resource: '*'
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${S3Bucket}/*
   CognitoAuthorizedRole:
     Type: AWS::IAM::Role
     Properties:
@@ -121,7 +123,8 @@ Resources:
           Statement:
           - Effect: Allow
             Action: '*'
-            Resource: '*'
+            Resource:
+            - Fn::Sub: arn:aws:s3:::${S3Bucket}/*
   IdentityPoolRoleMapping:
     Type: AWS::Cognito::IdentityPoolRoleAttachment
     Properties:
@@ -193,4 +196,9 @@ Outputs:
       - https://s3-bucket-cognt.auth.eu-west-2.amazoncognito.com/login?response_type=code&client_id=${appClientId}&redirect_uri=${url}
       - appClientId:
           Ref: UserPoolAppClient
-        url: https://s3-eu-west-2.amazonaws.com/cognito-app-s3-bucket/index.html
+        url: https://s3-eu-west-2.amazonaws.com/identity-pool-s3-bucket/index.html
+  CognitoAuthCommand:
+    Description: AWS CLI command for Amazon Cognito User Pool authentication
+    Value:
+      Fn::Sub: aws cognito-idp initiate-auth --auth-flow USER_PASSWORD_AUTH --client-id
+        ${UserPoolAppClient} --auth-parameters USERNAME=<username>,PASSWORD=<password>
